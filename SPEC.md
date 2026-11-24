@@ -1,4 +1,4 @@
-# 10ms SPEC — D12 canonical forms
+# SPEC.md — the language. One page. Only home of syntax.
 
 ## Canonical D12
 | Sai / không chuẩn | Dạng chuẩn | Sửa đúng |
@@ -17,7 +17,7 @@
 | Program / block | `program = statement*`; `block = NL INDENT statement+ DEDENT`; one statement per line, 2-space indentation, blank lines ignored, no tabs. |
 | Web statements | `page /`; `input name`; `btn "label" block`; `p expr`; `each expr name block`; `name = expr`. |
 | Worker handlers | `on GET /path block`; `on POST /path block`; `on every 1h block`. |
-| Worker statements | `need body.path type`; `reply expr`; `@effect args`; `name = expr` is allowed (`Assign` in `run.js` `execStmt`). |
+| Worker statements | `need body.path type`; `reply expr`; `@effect args`; `name = expr` is allowed. |
 | Values / need types | Integer; `"text"`; `name`; `body.path`; `[]`; `[expr]`; `{key: expr}`; types: `text`, `number`, `bool`, `array`, `object`. |
 
 ## Polymorphic `+`
