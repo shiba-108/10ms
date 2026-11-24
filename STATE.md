@@ -7,6 +7,8 @@ updated: 2026-11-24 | by: Trâu | rev: 10
 | T6 | One-page spec: the language, the only home of syntax, examples are tests | Cue | agent/cue/T6 |
 | T1 | Worker /echo validation, hit-log count, CPU test; PR #10 awaiting owner review | Cue | fix/worker-echo-log |
 | T13 | PR #13 open/await owner; Worker live; tests pass; CPU p50 0.101ms/p90 0.230ms | Trâu | agent/trau/T13 |
+| T4 | Draft PR #14; Node p50/p95/p99=0.0324/0.0467/0.0597ms; p50 spread 3.62%; workerd CPU + README pending | Manus | agent/manus/T4 |
+
 ## Done
 - Pivot v2 | 10ms = AI-native language. framework = first host. constitution P1-P8. 6 files rewritten timeless
 - T2 | machine layer -> README.md + DECISIONS.md
