@@ -9,7 +9,7 @@
   "budget": { "cpu_ms_max": 10, "cpu_ms_target": "2-4", "dependencies": 0 },
   "hosts": [{ "id": "cloudflare-workers", "status": "first", "bundle_kb_max": 50, "bundle_kb_target": 20 }],
   "layers": {
-    "machine": ["AGENTS.md", "STATE.md", "10ms.json"],
+    "machine": ["AGENTS.md", "STATE.md", "10ms.json", "SPEC.md"],
     "human": ["README.md", "DECISIONS.md"],
     "rule": "edit machine, AI translates to human, never edit human directly, conflict: machine wins"
   },
@@ -21,16 +21,7 @@
     "is": ["language made for AI to write", "program states intent, any host runs it", "zero dependencies", "measurable CPU budget", "readable in one prompt", "one way per job", "quality kept, work off hot path", "habit: measure, trim, share"],
     "is_not": ["a framework", "code tied to one platform", "wrapper around packages", "promise to trust", "codebase needing a map", "five styles per job", "features cut to look fast", "race to add features"]
   },
-  "story": {
-    "voice": "community: 'One of us', 'Our ceiling'. never first person",
-    "beats": [
-      "2006: elevator crash in Vancouver, programmer climbs 21 floors, refuses to call it normal, starts Rust (fungus built to survive)",
-      "2026: One of us builds Vionsky on a CF Pages Worker. request passes 10ms CPU, Error 1102. advice: framework, bigger plan",
-      "Our ceiling: free tier, tiny budget, slow phone, team of one, and AI that pays per token. same move: refuse to call it a wall",
-      "question: what would we build if the limit were the brief?"
-    ],
-    "closing_vi": "Giới hạn không phải bức tường, mà là nơi chúng ta bắt đầu."
-  },
+  "story": {"voice": "community: 'One of us', 'Our ceiling'. never first person", "beats": ["2006: elevator crash in Vancouver, programmer climbs 21 floors, refuses to call it normal, starts Rust (fungus built to survive)", "2026: One of us builds Vionsky on a CF Pages Worker. request passes 10ms CPU, Error 1102. advice: framework, bigger plan", "Our ceiling: free tier, tiny budget, slow phone, team of one, and AI that pays per token. same move: refuse to call it a wall", "question: what would we build if the limit were the brief?"], "closing_vi": "Giới hạn không phải bức tường, mà là nơi chúng ta bắt đầu."},
   "contribute": {
     "steps": ["read the 8 principles (1 min)", "pick 1 target (2 min)", "open PR in pr_shape (2 min)"],
     "targets": ["new host, same program unchanged", "cost check that rejects unprovable budgets", "error a machine fixes alone", "first-try benchmark from spec only", "your 10ms story (issue)"]
@@ -47,6 +38,16 @@
     { "id": "D8", "what": "no rule names syntax, version, vendor", "why": "rules must survive platform change" },
     { "id": "D9", "what": "2 layers, machine in English", "why": "min tokens; one truth; warm story" },
     { "id": "D10", "what": "STATE under 30 lines", "why": "AI context limited; STATE = now, LOG = history" },
-    { "id": "D11", "what": "micro-step + commit each step", "why": "limit killed a merge mid-way; max loss = 1 step" }
+    { "id": "D11", "what": "micro-step + commit each step", "why": "limit killed a merge mid-way; max loss = 1 step" },
+    { "id": "D12", "what": "canonical-or-error", "why": "one accepted form; alternatives error with the canonical form, so no formatter or style guide is needed" },
+    { "id": "D13", "what": "error = patch", "why": "JSON errors carry location, expectation, exact fix, and replay seed; AI applies the patch and reruns without a person" },
+    { "id": "D14", "what": "cost proof", "why": "bounded loops let the compiler prove worst-case CPU; programs that cannot prove <=10ms do not ship" },
+    { "id": "D15", "what": "declared effects (@)", "why": "the core is pure; external state uses @ and is logged, so the same log and input produce the same output" },
+    { "id": "D16", "what": "intent over procedure", "why": "programs declare what to do, not where; the host chooses without a second configuration step" },
+    { "id": "D17", "what": "one file = one product", "why": "page and on share one file; ship splits browser and server parts, so full-stack needs no glue" },
+    { "id": "D18", "what": "seal", "why": "ship returns a source hash and binds the runtime to it; the same source is the same product, and rollback points to an old hash" },
+    { "id": "D19", "what": "first-try rate", "why": "measure how often a new AI runs programs correctly on its first try from the one-page spec; reject features whose token cost exceeds their value" },
+    { "id": "D20", "what": "frozen core + lifespan layers", "why": "the core only adds; layers change at different rates, and rules must remain true if a platform disappears" },
+    { "id": "D21", "what": "mirror", "why": "a read-only command translates any program for people; readability is a gift, while the AI-written source remains the truth" }
   ]
 }
