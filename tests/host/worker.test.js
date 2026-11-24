@@ -2,6 +2,7 @@
 // Chạy: node tests/host/worker.test.js
 // Lưu ý: parse.js chưa sinh node Worker → dựng Worker AST bằng tay theo SPEC.
 const { createWorker } = require('../../src/host/worker/index');
+const { evalExpr } = require('../../src/host/worker/run');
 
 // ---- Worker AST đúng SPEC ----
 // on POST /echo
@@ -191,6 +192,39 @@ async function main() {
     assert(res.status === 200 && /<input name="text"/.test(html) && /<button/.test(html),
       'Page / render HTML có <input> và <button>');
     console.log('       html head:', html.slice(0, 100) + '…');
+  }
+  // --- 11. Polymorphic + for number, text, and list (SPEC D12) ---
+  {
+    const source = `page /\n  p 1 + 2\n  p "a" + "b"\n  p [1] + [2]\n`;
+    const { lex } = require('../../src/core/lex');
+    const { parse } = require('../../src/core/parse');
+    const { tokens, seed } = lex(source);
+    const ast = parse(tokens, seed);
+    const ctx = { env: new Map() };
+    const values = ast.body[0].body.map(s => evalExpr(s.expr, ctx));
+    assert(values[0] === 3 && values[1] === 'ab' &&
+      JSON.stringify(values[2]) === '[1,2]',
+      'number + number, text + text, and list + list');
+    console.log('       + results:', JSON.stringify(values));
+  }
+  // --- 12. Worker Assign and exact SPEC fixture ---
+  {
+    const { runOn } = require('../../src/host/worker/run');
+    const ctx = { env: new Map(), body: {}, seed: 7, response: null };
+    runOn({ body: [{ type: 'Assign', name: 'count', value: { type: 'Number', value: 2 } }] }, ctx);
+    assert(ctx.env.get('count') === 2, 'Worker name = expr runs through Assign in execStmt');
+    const workerExample = `on POST /echo
+  need body.msg text
+  reply {echo: body.msg}
+
+on GET /hits
+  reply {hits: @store.add "hits" 1}
+
+on every 1h
+  @store.del "hits"
+`;
+    const spec = require('fs').readFileSync(require('path').join(__dirname, '../../SPEC.md'), 'utf8');
+    assert(spec.includes(workerExample.trimEnd()), 'SPEC Worker example exactly matches the test fixture');
   }
 }
 
