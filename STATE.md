@@ -1,5 +1,5 @@
 # STATE.md (under 30 lines. now only. history -> LOG.md)
-updated: 2026-11-24 | by: Hoa tiêu 10ms | rev: 5
+updated: 2026-11-24 | by: Cue | rev: 6
 
 ## Doing
 | id | task | owner | branch |
@@ -12,6 +12,7 @@ updated: 2026-11-24 | by: Hoa tiêu 10ms | rev: 5
 - T2 | machine layer -> README.md + DECISIONS.md
 - T3 | LOG.md created
 - SPEC.md | draft (T6 will finalize)
+- ARCHITECTURE.md | architecture map
 - repo: github.com/shiba-108/10ms
 - 2-layer architecture (machine root, human translation)
 
