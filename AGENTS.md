@@ -21,6 +21,7 @@ conflict: machine layer wins. always.
 - a program states intent. a host decides where and how it runs
 - hosts are mortal (list: 10ms.json). the language is not
 - MIT, public. credit "10ms / Vionsky". copy = ad, not enemy. win by faster, clearer, more trusted
+- Worker contribution reference: first host Cloudflare Workers; fork -> separate branch -> local tests; CPU: 100-200 warm-up requests, median of 5 runs, target <10ms/request; PR fields: Goal - Code - CPU Benchmark - How to test.
 
 ## 3. CONSTITUTION (immutable)
 P1 under 10ms CPU. zero dependencies
