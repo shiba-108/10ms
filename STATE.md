@@ -8,6 +8,7 @@ updated: 2026-11-25 | by: Cue | rev: 13
 | T21 | Measure Worker bundle and rendered Web output; target 20 KiB, max 50 KiB | PR #31 open |
 | FX-SET | Runtime effects: @store.set; issue #26 | open |
 | T18 | Browser Web runtime: Page/Input/Btn/P/Each | PR #32 open |
+| T19 | Ship pipeline; owner Cue | doing |
 ## Done
 - T1 | Worker /echo validation, hit-log count, CPU test; PR #10 merged
 - T6a | SPEC v1/canonical forms, 7 effects/examples; PR #17 merged
