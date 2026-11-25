@@ -1,0 +1,9 @@
+page /
+  tasks = []
+  text = ""
+  input text
+  btn "Add"
+    tasks = tasks + [text]
+    text = ""
+  each tasks t
+    p t
