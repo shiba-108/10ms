@@ -4,6 +4,7 @@
 const { createWorker } = require('../../src/host/worker/index');
 const { evalExpr } = require('../../src/host/worker/run');
 const { createLog } = require('../../src/host/worker/log');
+const { createEffects } = require('../../src/host/worker/effects');
 const { createHash } = require('node:crypto');
 
 // ---- Worker AST đúng SPEC ----
@@ -149,6 +150,26 @@ function get(url) { return new Request(url, { method: 'GET' }); }
 function assert(cond, msg) {
   if (!cond) { console.error('FAIL:', msg); process.exitCode = 1; }
   else console.log('OK  :', msg);
+}
+
+// Keep a KV-shaped namespace across effect instances to verify persistent storage (P4, P7).
+function createKVStoreMock() {
+  const entries = new Map();
+  return {
+    async get(key, options = {}) {
+      const entry = entries.get(key);
+      if (!entry) return null;
+      return options.type === 'json' ? JSON.parse(entry.value) : entry.value;
+    },
+    async getWithMetadata(key) {
+      const entry = entries.get(key);
+      return { value: entry ? entry.value : null, metadata: entry ? entry.metadata : null };
+    },
+    async put(key, value, options = {}) {
+      entries.set(key, { value: String(value), metadata: options.metadata || null });
+    },
+    async delete(key) { entries.delete(key); },
+  };
 }
 
 async function main() {
@@ -322,6 +343,47 @@ on every 1h
     const replay = replayLog.replay(drv => drv.call('store.set', ['theme', 'dark']), 7);
     assert(replay.result === 'dark' && replay.consumed === 1,
       '@store.set log replays the same output');
+  }
+
+  // --- 13b. KV write → read and persistence across effects instances (P4, P7) ---
+  {
+    const namespace = createKVStoreMock();
+    const firstLog = createLog();
+    const writer = createEffects(firstLog, namespace, 7);
+    const setResult = await writer.call('store.set', ['persist', { value: 'still here' }]);
+    const readResult = await writer.call('store.get', ['persist']);
+    const reader = createEffects(createLog(), namespace, 7);
+    const persistedResult = await reader.call('store.get', ['persist']);
+    assert(JSON.stringify(setResult) === '{"value":"still here"}' &&
+      JSON.stringify(readResult) === '{"value":"still here"}' &&
+      JSON.stringify(persistedResult) === '{"value":"still here"}',
+      'KV @store writes, reads back, and retains the value in a fresh effects instance');
+    assert(firstLog.snapshot().map(entry => entry.kind).join(',') === 'store.set,store.get',
+      'KV @store logs completed writes and reads in order');
+
+    const benchmarkLog = createLog();
+    const benchmark = createEffects(benchmarkLog, createKVStoreMock(), 7);
+    const N = 100;
+    for (let i = 0; i < 20; i++) {
+      await benchmark.call('store.set', ['cpu', 'value']);
+      await benchmark.call('store.get', ['cpu']);
+    }
+    const samples = [];
+    for (let batch = 0; batch < 100; batch++) {
+      const start = process.cpuUsage();
+      for (let i = 0; i < N; i++) {
+        await benchmark.call('store.set', ['cpu', 'value']);
+        await benchmark.call('store.get', ['cpu']);
+      }
+      const cpu = process.cpuUsage(start);
+      samples.push((cpu.user + cpu.system) / 1000 / N);
+    }
+    samples.sort((a, b) => a - b);
+    const p50 = samples[Math.floor((samples.length - 1) * 0.50)];
+    const p90 = samples[Math.floor((samples.length - 1) * 0.90)];
+    console.log('       KV @store set+get CPU p50/p90:', p50.toFixed(4), '/', p90.toFixed(4),
+      'ms/round-trip (100 batches × ' + N + '; process.cpuUsage user+system)');
+    assert(p50 < 10 && p90 < 10, 'KV @store set+get CPU p50 and p90 < 10ms');
   }
 
   // --- 14. @store.set: 100-run output hash and real Worker CPU p50/p90 (P1, P4) ---

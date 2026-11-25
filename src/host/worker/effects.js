@@ -15,8 +15,27 @@ const ALLOWED = {
   rand: ['int'],
 };
 
+// Accept only KV-shaped bindings, leaving ordinary Maps on the local path (P7).
+function isKVNamespace(value) {
+  return value && typeof value.get === 'function' &&
+    typeof value.put === 'function' && typeof value.delete === 'function';
+}
+
+let runtimeStorePromise;
+
+// Resolve Cloudflare's module env lazily so Node tests need no platform dependency (P7).
+async function resolveRuntimeStore() {
+  if (!runtimeStorePromise) {
+    runtimeStorePromise = import('cloudflare:workers')
+      .then(({ env }) => isKVNamespace(env && env.STORE) ? env.STORE : null)
+      .catch(() => null);
+  }
+  return runtimeStorePromise;
+}
+
 function createEffects(log, store, seed = 0, fetchImpl) {
   const box = store instanceof Map ? store : new Map();
+  const injectedKV = !(store instanceof Map) && isKVNamespace(store) ? store : null;
   const hasInjectedFetch = fetchImpl !== undefined;
   const request = hasInjectedFetch
     ? (typeof fetchImpl === 'function' ? fetchImpl : null)
@@ -24,28 +43,68 @@ function createEffects(log, store, seed = 0, fetchImpl) {
   // Keep random output stable for the same seed without adding entropy or dependencies (P1, P4).
   let randState = Number(seed) >>> 0;
 
-  function add(key, delta) {
-    const cur = Number(box.get(key) || 0);
+  // Prefer the bound KV namespace; keep the Map only when running outside Workers (P7).
+  async function resolveStore() {
+    return injectedKV || await resolveRuntimeStore() || box;
+  }
+
+  // Decode one value through the same interface for KV and the local test Map (P4, P7).
+  async function readStoreValue(target, key) {
+    if (target instanceof Map) return target.has(key) ? target.get(key) : null;
+    return target.get(String(key), { type: 'json' });
+  }
+
+  // Persist JSON values and mark their metadata so deletes preserve existence semantics (P4, P7).
+  async function writeStoreValue(target, key, value) {
+    if (target instanceof Map) {
+      target.set(key, value);
+      return;
+    }
+    await target.put(String(key), JSON.stringify(value), { metadata: { tenms: true } });
+  }
+
+  // KV delete returns no existence bit, so read the marker before removing the key (P4, P7).
+  async function deleteStoreValue(target, key) {
+    if (target instanceof Map) return target.delete(key);
+    const stored = typeof target.getWithMetadata === 'function'
+      ? await target.getWithMetadata(String(key))
+      : { value: await target.get(String(key), { type: 'json' }), metadata: null };
+    const existed = Boolean(stored && stored.value !== null) ||
+      Boolean(stored && stored.metadata && stored.metadata.tenms === true);
+    await target.delete(String(key));
+    return existed;
+  }
+
+  // Log only completed writes so replay describes the durable effect result (P4, D15).
+  async function add(key, delta) {
+    const target = await resolveStore();
+    const cur = Number(await readStoreValue(target, key) || 0);
     const next = cur + Number(delta);
-    box.set(key, next);
+    await writeStoreValue(target, key, next);
     log.record('store.add', [key, delta], next);
     return next;
   }
 
-  function del(key) {
-    const existed = box.delete(key);
+  // Return the previous existence state while recording the completed deletion (P4, D15).
+  async function del(key) {
+    const target = await resolveStore();
+    const existed = await deleteStoreValue(target, key);
     log.record('store.del', [key], existed);
     return existed;
   }
 
-  function get(key) {
-    const v = box.has(key) ? box.get(key) : null;
+  // Return the durable value and log the exact output for replay (P4, D15).
+  async function get(key) {
+    const target = await resolveStore();
+    const v = await readStoreValue(target, key);
     log.record('store.get', [key], v);
     return v;
   }
 
-  function set(key, value) {
-    box.set(key, value);
+  // Complete the durable write before exposing its value to the program (P1, P4).
+  async function set(key, value) {
+    const target = await resolveStore();
+    await writeStoreValue(target, key, value);
     log.record('store.set', [key, value], value);
     return value;
   }
@@ -149,6 +208,7 @@ function createEffects(log, store, seed = 0, fetchImpl) {
     return { add, del, get, set, fetch: netFetch, now, int }[fn](...args);
   }
 
+  // Snapshots remain limited to the in-memory adapter; KV is read through effects (P7).
   function snapshotStore() { return new Map(box); }
 
   return { call, add, del, get, set, netFetch, now, int, snapshotStore };

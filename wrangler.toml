@@ -5,3 +5,7 @@ workers_dev = true
 
 [observability]
 enabled = true
+
+[[kv_namespaces]]
+binding = "STORE"
+id = "fcfb154e087b45828144cc600226f758"
