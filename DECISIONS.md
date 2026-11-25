@@ -1,6 +1,6 @@
 # Why We Did It This Way
 
-Eleven decisions, each in two lines. This page is a translation: to change a decision, change it at the machine layer first.
+Twenty-one decisions, each in two lines. This page is a translation: to change a decision, change it at the machine layer first.
 
 - **D1. 10ms is a language. The framework is only its first host.**
   Why: Platforms and frameworks age. A language made for AI can outlive both.
@@ -34,32 +34,32 @@ Eleven decisions, each in two lines. This page is a translation: to change a dec
 
 - **D11. Work in micro-steps and commit after each one.**
   Why: A sudden limit once killed a merge halfway. Now the most we can lose is one step.
-- **D12. Dạng chuẩn duy nhất (Canonical-or-Error).**
-  Why: Compiler chỉ nhận đúng 1 cách viết. Viết khác thì báo lỗi kèm bản chuẩn, nên không cần formatter hay style guide.
+- **D12. One canonical form (Canonical-or-Error).**
+  Why: The compiler accepts one way to write something. Any other form returns an error with the canonical form, so no formatter or style guide is needed.
 
-- **D13. Lỗi là bản vá (Error = Patch).**
-  Why: Mỗi lỗi là JSON gồm vị trí, điều mong đợi, bản sửa chính xác và seed để chạy lại y hệt. AI áp bản vá rồi chạy lại, không cần người.
+- **D13. Errors are patches (Error = Patch).**
+  Why: Each error is JSON with a location, expectation, exact fix, and replay seed. The AI applies the patch and reruns, without a person.
 
-- **D14. Chứng minh chi phí (Cost Proof).**
-  Why: Mọi vòng lặp đều có chặn, compiler tính cận trên CPU. Chương trình không chứng minh được ≤10ms thì không ship.
+- **D14. Cost proof.**
+  Why: Every loop is bounded, so the compiler can calculate an upper bound on CPU. A program that cannot prove ≤10ms does not ship.
 
-- **D15. Hiệu ứng khai báo (@).**
-  Why: Lõi thuần, mọi thứ chạm bên ngoài (store, mạng, giờ, ngẫu nhiên) đều qua @ và được ghi vào sổ. Cùng sổ cộng cùng input ra cùng output.
+- **D15. Declared effects (@).**
+  Why: The core is pure; anything that touches external state (storage, network, time, randomness) goes through @ and is logged. The same log and input produce the same output.
 
-- **D16. Ý định thay vì thủ tục (Intent).**
-  Why: Chương trình nói làm gì (page, on), không nói chạy ở đâu. Host tự chọn, không có bước cấu hình thứ hai.
+- **D16. Intent over procedure.**
+  Why: Programs declare what to do, not where to run. The host chooses, with no second configuration step.
 
-- **D17. Một file = một sản phẩm.**
-  Why: Page và on nằm chung một file, ship tự tách phần trình duyệt và phần máy chủ. Full-stack không cần keo dán.
+- **D17. One file = one product.**
+  Why: Page and on share one file; ship splits the browser and server parts, so full-stack needs no glue.
 
-- **D18. Dấu niêm phong (Seal).**
-  Why: Ship trả về mã băm của nguồn, bản chạy gắn với mã băm đó. Cùng nguồn là cùng sản phẩm, rollback chỉ là trỏ lại mã cũ.
+- **D18. Seal.**
+  Why: Ship returns a hash of the source and binds the runtime to it. The same source is the same product; rollback points to an old hash.
 
-- **D19. Chỉ số bắc đẩu (First-Try Rate).**
-  Why: Đưa một AI mới chỉ spec 1 trang, đo bao nhiêu % chương trình chạy đúng ngay lần đầu. Kèm thuế token: tính năng tốn token hơn lợi thì bị loại.
+- **D19. First-try rate.**
+  Why: Measure how often a new AI runs programs correctly on its first try from the one-page spec. Reject features whose token cost exceeds their value.
 
-- **D20. Lõi đóng băng + tầng tuổi thọ.**
-  Why: Lõi chỉ thêm, không phá. Mỗi tầng đổi nhanh chậm khác nhau, câu nào hết đúng khi nền tảng biến mất thì không được vào luật.
+- **D20. Frozen core + lifespan layers.**
+  Why: The core only adds; layers change at different rates, and rules must remain true if a platform disappears.
 
-- **D21. Gương (Mirror).**
-  Why: Lệnh dịch bất kỳ chương trình ra tiếng người, chỉ đọc. Người đọc được là quà tặng, không phải mục tiêu; nguồn thật vẫn là bản AI viết. 
+- **D21. Mirror.**
+  Why: A read-only command translates any program for people. Readability is a gift, while the AI-written source remains the truth.
