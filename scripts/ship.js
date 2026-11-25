@@ -83,7 +83,7 @@ function main(argv) {
   if (dryRun) console.log('Mode: Wrangler dry run');
 
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const args = ['--yes', 'wrangler', 'deploy', '--config', 'wrangler.toml'];
+  const args = ['--yes', 'wrangler@4.168.0', 'deploy', '--config', 'wrangler.toml'];
   if (dryRun) args.push('--dry-run');
   const result = spawnSync(npx, args, { cwd: ROOT, encoding: 'utf8' });
   if (result.stdout) process.stdout.write(result.stdout);
