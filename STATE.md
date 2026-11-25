@@ -1,10 +1,11 @@
 # STATE.md (under 30 lines. now only. history -> LOG.md)
-updated: 2026-11-25 | by: Cue | rev: 11
+updated: 2026-11-25 | by: Cue | rev: 12
 ## Doing
 | id | task | status |
 |---|---|---|
 | T4 | Repeatable CPU benchmark; PR #14 | open |
 | T12 | Conditional PR auto-merge policy; PR #12 | open |
+| T21 | Measure Worker bundle and rendered Web output; target 20 KiB, max 50 KiB | PR ready |
 ## Done
 - T1 | Worker /echo validation, hit-log count, CPU test; PR #10 merged
 - T6a | SPEC v1/canonical forms, 7 effects/examples; PR #17 merged
