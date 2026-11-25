@@ -1,5 +1,5 @@
 // src/host/worker/effects.js
-// 10ms host · effects: CHỖ DUY NHẤT chạm ra ngoài. @store.add/del/get.
+// 10ms host · effects: CHỖ DUY NHẤT chạm ra ngoài. @store.add/del/get/set.
 // Lõi không gọi trực tiếp — mọi lần chạm đi qua log (D15). P1 · P4.
 
 function d13(expected, fix, seed) {
@@ -8,7 +8,7 @@ function d13(expected, fix, seed) {
   return e;
 }
 
-const ALLOWED = { 'store': ['add', 'del', 'get'] };
+const ALLOWED = { 'store': ['add', 'del', 'get', 'set'] };
 
 function createEffects(log, store, seed = 0) {
   const box = store instanceof Map ? store : new Map();
@@ -33,6 +33,12 @@ function createEffects(log, store, seed = 0) {
     return v;
   }
 
+  function set(key, value) {
+    box.set(key, value);
+    log.record('store.set', [key, value], value);
+    return value;
+  }
+
   function call(path, args) {
     const [ns, fn] = String(path).split('.');
     if (!ALLOWED[ns] || !ALLOWED[ns].includes(fn)) {
@@ -47,12 +53,12 @@ function createEffects(log, store, seed = 0) {
     if (!Array.isArray(args)) {
       throw d13('args as array for @' + path, '@' + path + ' [arg1, arg2]', seed);
     }
-    return { add, del, get }[fn](...args);
+    return { add, del, get, set }[fn](...args);
   }
 
   function snapshotStore() { return new Map(box); }
 
-  return { call, add, del, get, snapshotStore };
+  return { call, add, del, get, set, snapshotStore };
 }
 
 module.exports = { createEffects };

@@ -3,6 +3,8 @@
 // Lưu ý: parse.js chưa sinh node Worker → dựng Worker AST bằng tay theo SPEC.
 const { createWorker } = require('../../src/host/worker/index');
 const { evalExpr } = require('../../src/host/worker/run');
+const { createLog } = require('../../src/host/worker/log');
+const { createHash } = require('node:crypto');
 
 // ---- Worker AST đúng SPEC ----
 // on POST /echo
@@ -57,6 +59,35 @@ const WORKER_AST = {
           args: [{ type: 'String', value: 'hits' }],
         },
       ],
+    },
+  ],
+};
+
+const STORE_SET_AST = {
+  type: 'Program',
+  body: [
+    {
+      type: 'On', method: 'GET', path: '/set', body: [{
+        type: 'Reply', value: {
+          type: 'Object', entries: [{ key: 'value', value: {
+            type: 'Effect', path: 'store.set', args: [
+              { type: 'String', value: 'theme' },
+              { type: 'String', value: 'dark' },
+            ],
+          } }],
+        },
+      }],
+    },
+    {
+      type: 'On', method: 'GET', path: '/get', body: [{
+        type: 'Reply', value: {
+          type: 'Object', entries: [{ key: 'value', value: {
+            type: 'Effect', path: 'store.get', args: [
+              { type: 'String', value: 'theme' },
+            ],
+          } }],
+        },
+      }],
     },
   ],
 };
@@ -225,6 +256,61 @@ on every 1h
 `;
     const spec = require('fs').readFileSync(require('path').join(__dirname, '../../SPEC.md'), 'utf8');
     assert(spec.includes(workerExample.trimEnd()), 'SPEC Worker example exactly matches the test fixture');
+  }
+
+  // --- 13. @store.set writes, returns, logs, and replays its output (D15) ---
+  {
+    const wSet = createWorker({
+      ast: STORE_SET_AST, seed: 7, store: new Map([['theme', 'light']]),
+    });
+    const setBody = await (await wSet.fetch(get('http://x/set'))).json();
+    const getBody = await (await wSet.fetch(get('http://x/get'))).json();
+    const entry = wSet.log.snapshot().find(e => e.kind === 'store.set');
+    assert(setBody.value === 'dark' && getBody.value === 'dark',
+      '@store.set returns value and overwrites existing store entry');
+    assert(JSON.stringify(entry) === JSON.stringify({
+      seq: 0, kind: 'store.set', args: ['theme', 'dark'], result: 'dark',
+    }), '@store.set output is recorded with its input for replay');
+
+    const replayLog = createLog();
+    replayLog.record(entry.kind, entry.args, entry.result);
+    const replay = replayLog.replay(drv => drv.call('store.set', ['theme', 'dark']), 7);
+    assert(replay.result === 'dark' && replay.consumed === 1,
+      '@store.set log replays the same output');
+  }
+
+  // --- 14. @store.set: 100-run output hash and real Worker CPU p50/p90 (P1, P4) ---
+  {
+    const hashes = [];
+    for (let i = 0; i < 100; i++) {
+      const wSet = createWorker({
+        ast: STORE_SET_AST, seed: 7, store: new Map([['theme', 'light']]),
+      });
+      const body = await (await wSet.fetch(get('http://x/set'))).json();
+      const payload = JSON.stringify({ body, log: wSet.log.snapshot() });
+      hashes.push(createHash('sha256').update(payload).digest('hex'));
+    }
+    const outputHash = hashes[0];
+    assert(hashes.every(hash => hash === outputHash),
+      '100 fresh @store.set runs have identical output+log hash (' + outputHash + ')');
+    console.log('       @store.set 100-run SHA-256:', outputHash);
+
+    const wSet = createWorker({ ast: STORE_SET_AST, seed: 7 });
+    const N = 100;
+    for (let i = 0; i < 20; i++) await wSet.fetch(get('http://x/set'));
+    const samples = [];
+    for (let batch = 0; batch < 100; batch++) {
+      const start = process.cpuUsage();
+      for (let i = 0; i < N; i++) await wSet.fetch(get('http://x/set'));
+      const cpu = process.cpuUsage(start);
+      samples.push((cpu.user + cpu.system) / 1000 / N);
+    }
+    samples.sort((a, b) => a - b);
+    const p50 = samples[Math.floor((samples.length - 1) * 0.50)];
+    const p90 = samples[Math.floor((samples.length - 1) * 0.90)];
+    console.log('       @store.set CPU p50/p90:', p50.toFixed(4), '/', p90.toFixed(4),
+      'ms/request (100 batches × ' + N + ' requests; process.cpuUsage user+system)');
+    assert(p50 < 10 && p90 < 10, '@store.set CPU p50 and p90 < 10ms/request');
   }
 }
 
