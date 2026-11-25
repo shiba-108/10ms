@@ -1,68 +1,29 @@
 // tests/host/worker.test.js
 // Chạy: node tests/host/worker.test.js
-// Lưu ý: parse.js chưa sinh node Worker → dựng Worker AST bằng tay theo SPEC.
+// Worker example chính đi qua lexer/parser thật; fixture effect phụ giữ riêng.
+const fs = require('node:fs');
+const path = require('node:path');
 const { createWorker } = require('../../src/host/worker/index');
 const { evalExpr } = require('../../src/host/worker/run');
 const { createLog } = require('../../src/host/worker/log');
 const { createEffects } = require('../../src/host/worker/effects');
 const { createHash } = require('node:crypto');
+const { lex } = require('../../src/core/lex');
+const { parse } = require('../../src/core/parse');
 
-// ---- Worker AST đúng SPEC ----
-// on POST /echo
-//   need body.msg text
-//   reply {echo: body.msg}
-// on GET /hits
-//   reply {hits: @store.add "hits" 1}
-// on every 1h
-//   @store.del "hits"
-const WORKER_AST = {
-  type: 'Program',
-  body: [
-    {
-      type: 'On', method: 'POST', path: '/echo', line: 1,
-      body: [
-        { type: 'Need', path: 'body.msg', ty: 'text', line: 2 },
-        {
-          type: 'Reply', line: 3,
-          value: {
-            type: 'Object',
-            entries: [{ key: 'echo', value: { type: 'Path', path: 'body.msg' } }],
-          },
-        },
-      ],
-    },
-    {
-      type: 'On', method: 'GET', path: '/hits', line: 5,
-      body: [
-        {
-          type: 'Reply', line: 6,
-          value: {
-            type: 'Object',
-            entries: [{
-              key: 'hits',
-              value: {
-                type: 'Effect', path: 'store.add',
-                args: [
-                  { type: 'String', value: 'hits' },
-                  { type: 'Number', value: 1 },
-                ],
-              },
-            }],
-          },
-        },
-      ],
-    },
-    {
-      type: 'On', every: '1h', line: 8,
-      body: [
-        {
-          type: 'EffectCall', path: 'store.del', line: 9,
-          args: [{ type: 'String', value: 'hits' }],
-        },
-      ],
-    },
-  ],
-};
+// Read the canonical example so this integration test exercises source → tokens → AST.
+function readSpecExample(label) {
+  const spec = fs.readFileSync(path.join(__dirname, '../../SPEC.md'), 'utf8');
+  const examples = spec.split('## Examples')[1];
+  const labelAt = examples.indexOf(label);
+  const fence = '```10ms\n';
+  const start = examples.indexOf(fence, labelAt) + fence.length;
+  const end = examples.indexOf('\n```', start);
+  return examples.slice(start, end) + '\n';
+}
+const WORKER_SOURCE = readSpecExample('Worker (');
+const { tokens: workerTokens, seed: workerSeed } = lex(WORKER_SOURCE);
+const WORKER_AST = parse(workerTokens, workerSeed);
 
 const STORE_SET_AST = {
   type: 'Program',
@@ -304,24 +265,15 @@ async function main() {
       'number + number, text + text, and list + list');
     console.log('       + results:', JSON.stringify(values));
   }
-  // --- 12. Worker Assign and exact SPEC fixture ---
+  // --- 12. Worker Assign and parsed SPEC fixture ---
   {
     const { runOn } = require('../../src/host/worker/run');
     const ctx = { env: new Map(), body: {}, seed: 7, response: null };
     await runOn({ body: [{ type: 'Assign', name: 'count', value: { type: 'Number', value: 2 } }] }, ctx);
     assert(ctx.env.get('count') === 2, 'Worker name = expr runs through Assign in execStmt');
-    const workerExample = `on POST /echo
-  need body.msg text
-  reply {echo: body.msg}
-
-on GET /hits
-  reply {hits: @store.add "hits" 1}
-
-on every 1h
-  @store.del "hits"
-`;
-    const spec = require('fs').readFileSync(require('path').join(__dirname, '../../SPEC.md'), 'utf8');
-    assert(spec.includes(workerExample.trimEnd()), 'SPEC Worker example exactly matches the test fixture');
+    assert(WORKER_AST.body.length === 3 && WORKER_AST.body[0].path === '/echo' &&
+      WORKER_AST.body[1].path === '/hits' && WORKER_AST.body[2].every === '1h',
+      'SPEC Worker source lexes and parses into POST, GET, and scheduled handlers');
   }
 
   // --- 13. @store.set writes, returns, logs, and replays its output (D15) ---
