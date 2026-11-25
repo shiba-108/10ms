@@ -74,9 +74,15 @@ function lex(src) {
       if (ch === ' ') { p++; continue; }
       if (ch === '=') { tokens.push({ type: 'ASSIGN', value: '=', line: lineNo, col }); p++; continue; }
       if (ch === '+') { tokens.push({ type: 'PLUS',   value: '+', line: lineNo, col }); p++; continue; }
+      if (ch === '@') { tokens.push({ type: 'AT', value: '@', line: lineNo, col }); p++; continue; }
+      if (ch === '.') { tokens.push({ type: 'DOT', value: '.', line: lineNo, col }); p++; continue; }
       if (ch === '[') { tokens.push({ type: 'LBRACK', value: '[', line: lineNo, col }); p++; continue; }
       if (ch === ']') { tokens.push({ type: 'RBRACK', value: ']', line: lineNo, col }); p++; continue; }
       if (ch === '/') { tokens.push({ type: 'SLASH',  value: '/', line: lineNo, col }); p++; continue; }
+      if (ch === '{') { tokens.push({ type: 'LBRACE', value: '{', line: lineNo, col }); p++; continue; }
+      if (ch === '}') { tokens.push({ type: 'RBRACE', value: '}', line: lineNo, col }); p++; continue; }
+      if (ch === ':') { tokens.push({ type: 'COLON', value: ':', line: lineNo, col }); p++; continue; }
+      if (ch === ',') { tokens.push({ type: 'COMMA', value: ',', line: lineNo, col }); p++; continue; }
 
       if (ch === '"') {
         let j = p + 1;
@@ -99,6 +105,14 @@ function lex(src) {
       if (ch >= '0' && ch <= '9') {
         let j = p;
         while (j < content.length && content[j] >= '0' && content[j] <= '9') j++;
+        const unit = content[j];
+        const afterUnit = content[j + 1];
+        if ((unit === 'h' || unit === 'm' || unit === 's') &&
+            !(afterUnit && /[A-Za-z0-9_]/.test(afterUnit))) {
+          tokens.push({ type: 'DURATION', value: content.slice(p, j + 1), line: lineNo, col });
+          p = j + 1;
+          continue;
+        }
         tokens.push({ type: 'NUMBER', value: parseInt(content.slice(p, j), 10), line: lineNo, col });
         p = j;
         continue;
