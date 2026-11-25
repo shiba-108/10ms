@@ -78,7 +78,7 @@ No permission needed. No meeting. No setup guide. Three steps.
 
 1. **Read (1 min).** The eight principles above. Nothing else is required.
 2. **Pick one target (2 min).** Change one thing. Take one from the table, or open an issue with your own.
-3. **Open a PR (2 min).** Paste this into the description and fill every section.
+3. **Open a PR (2 min).** Use the [A3 PR template](.github/PULL_REQUEST_TEMPLATE.md) and the full [contribution guide](CONTRIBUTING.md).
 
 **First host: Cloudflare Workers.** A Worker PR needs only a PC, code plus `wrangler.toml`, local tests via `wrangler dev --local`, Miniflare, or Node, and a `process.cpuUsage()` CPU measurement below 10 ms per request. The maintainer handles real deployment after merge.
 
