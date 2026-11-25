@@ -1,0 +1,10 @@
+# Keep the Worker deploy target separate from the default Web ship config. P3 · P7.
+name = "10ms-worker"
+main = "src/host/worker/cloudflare.js"
+compatibility_date = "2026-11-24"
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["0 * * * *"]

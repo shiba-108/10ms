@@ -1,9 +1,11 @@
 # STATE.md (under 30 lines. now only. history -> LOG.md)
-updated: 2026-11-25 | by: Cue | rev: 14
+updated: 2026-11-25 | by: Manus | rev: 16
 ## Doing
 | id | task | status |
 |---|---|---|
 | T4 | Repeatable CPU benchmark; PR #14 | open |
+| PR47 | Worker-specific Wrangler config; preserve Web ship config | open |
+| PR41 | Minify/test the Worker-specific bundle after #47 | queued |
 ## Open — claimable
 | id | input → output | test | effort |
 |---|---|---|---|
@@ -21,3 +23,4 @@ updated: 2026-11-25 | by: Cue | rev: 14
 - T20: runtime-effect scope awaits owner's decision.
 - Pre-change token baseline unavailable; do not infer before/after delta.
 - T13 dropped; owner left; code in PR #15 superseded.
+- Issue #11 live deploy/Cloudflare CPU confirmation remains owner-only; not attempted.
