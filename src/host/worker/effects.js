@@ -48,10 +48,11 @@ function createEffects(log, store, seed = 0, fetchImpl) {
     return injectedKV || await resolveRuntimeStore() || box;
   }
 
-  // Decode one value through the same interface for KV and the local test Map (P4, P7).
+  // Decode one value through KV and Map; missing keys are empty lists (P4, P7).
   async function readStoreValue(target, key) {
-    if (target instanceof Map) return target.has(key) ? target.get(key) : null;
-    return target.get(String(key), { type: 'json' });
+    if (target instanceof Map) return target.has(key) ? target.get(key) : [];
+    const value = await target.get(String(key), { type: 'json' });
+    return value === null ? [] : value;
   }
 
   // Persist JSON values and mark their metadata so deletes preserve existence semantics (P4, P7).
@@ -121,9 +122,19 @@ function createEffects(log, store, seed = 0, fetchImpl) {
     let result;
     try {
       if (!request) throw new Error('runtime fetch is unavailable');
+      let options;
+      if (args.length === 2) {
+        options = { ...args[1] };
+        if (options.body !== null && typeof options.body === 'object') {
+          options.body = JSON.stringify(options.body);
+          const headers = new Headers(options.headers || {});
+          if (!headers.has('content-type')) headers.set('content-type', 'application/json');
+          options.headers = headers;
+        }
+      }
       const response = args.length === 1
         ? await request(args[0])
-        : await request(args[0], args[1]);
+        : await request(args[0], options);
       const headers = {};
       const entries = Array.from(response.headers.entries()).sort((a, b) =>
         a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
