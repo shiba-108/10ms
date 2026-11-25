@@ -21,7 +21,7 @@
 | Values / need types | Integer; `"text"`; `name`; `body.path`; `[]`; `[expr]`; `{key: expr}`; types: `text`, `number`, `bool`, `array`, `object`. |
 
 ## Polymorphic `+`
-Valid for same-type pairs: `number + number → number`; `text + text → text`; `list + list → concatenated list`.
+Valid for same-type pairs: `number + number → number`; `text + text → text`; `array + array → concatenated array`.
 
 ## Effects
 `@store.get` (read); `@store.add` (numeric add); `@store.del` (delete); `@store.set` (write).
