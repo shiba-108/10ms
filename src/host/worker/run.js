@@ -2,6 +2,7 @@
 // 10ms host · run: AST → chạy thật. Page/Input/Btn/Each/Assign (Web)
 // và On/Need/Reply/EffectCall (Worker). Thuần: chỉ gọi ctx.fx, không fetch/Date.
 // P1 · P4 · P7 · D16.
+const { MAX_ITER } = require('../../core/cost');
 
 function d13(kind, line, expected, fix, seed) {
   const e = new Error(kind);
@@ -30,6 +31,16 @@ function lookupPath(root, path) {
     cur = cur[parts[i]];
   }
   return { found: true, value: cur };
+}
+
+// Keep dynamic host loops within the same bound used by the core proof (P1, D14).
+function checkEachLimit(list, s, ctx) {
+  if (list.length > MAX_ITER) {
+    throw d13('cost', s.line,
+      `each list has at most ${MAX_ITER} items`,
+      `reduce each list to at most ${MAX_ITER} items`,
+      ctx.seed === undefined ? 0 : ctx.seed);
+  }
 }
 
 // ---- eval biểu thức ----
@@ -89,6 +100,7 @@ function execStmt(s, ctx) {
     case 'Each': {
       const list = evalExpr(s.list, ctx);
       if (!Array.isArray(list)) return;
+      checkEachLimit(list, s, ctx);
       const saved = s.var;
       const prev = ctx.env.has(saved) ? ctx.env.get(saved) : undefined;
       for (const item of list) {
@@ -122,17 +134,26 @@ function escapeHtml(v) {
 function renderStmt(s, ctx) {
   switch (s.type) {
     case 'Assign':
-      ctx.env.set(s.name, evalExpr(s.value, ctx));
+      // Page assignments initialize defaults on GET; POST keeps submitted state (P4).
+      if (!ctx.preserveState || !ctx.env.has(s.name)) {
+        ctx.env.set(s.name, evalExpr(s.value, ctx));
+      }
       return '';
     case 'Input':
-      return '<input name="' + escapeHtml(s.var) + '" />';
+      return '<input name="' + escapeHtml(s.var) + '" type="text" value="' +
+        escapeHtml(ctx.env.get(s.var)) + '" />';
     case 'P':
       return '<p>' + escapeHtml(evalExpr(s.expr, ctx)) + '</p>';
-    case 'Btn':
-      return '<button data-label="' + escapeHtml(s.label) + '">' + escapeHtml(s.label) + '</button>';
+    case 'Btn': {
+      const id = ctx.buttons ? ctx.buttons.length : 0;
+      if (ctx.buttons) ctx.buttons.push({ body: s.body, env: new Map(ctx.env) });
+      return '<button type="submit" name="__btn" value="' + id + '" data-label="' +
+        escapeHtml(s.label) + '">' + escapeHtml(s.label) + '</button>';
+    }
     case 'Each': {
       const list = evalExpr(s.list, ctx);
       if (!Array.isArray(list)) return '';
+      checkEachLimit(list, s, ctx);
       const saved = s.var;
       const prev = ctx.env.has(saved) ? ctx.env.get(saved) : undefined;
       let html = '';
@@ -150,8 +171,12 @@ function renderStmt(s, ctx) {
 }
 
 function renderPage(pageNode, ctx) {
-  const parts = pageNode.body.map(s => renderStmt(s, ctx));
-  return '<!doctype html><html><body>' + parts.join('') + '</body></html>';
+  ctx.buttons = [];
+  const parts = pageNode.body.map(s => renderStmt(s, ctx)).join('');
+  const state = escapeHtml(JSON.stringify(Object.fromEntries(ctx.env)));
+  return '<!doctype html><html><body><form method="post">' +
+    '<input type="hidden" name="__state" value="' + state + '" />' +
+    parts + '</form></body></html>';
 }
 
 // ---- On (Worker) ----
