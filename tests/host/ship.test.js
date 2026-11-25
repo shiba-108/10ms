@@ -38,8 +38,9 @@ async function main() {
   const html = await response.text();
   assert(response.status === 200 && response.headers.get('x-10ms-seal') === program.seal,
     'GET / returns 200 with the source seal header');
-  assert(/<input name="text" \/>/.test(html) && /<button/.test(html),
-    'GET / renders web.10ms HTML');
+  assert(/<form method="post">/.test(html) && /<input name="text"[^>]*>/.test(html) &&
+    /<button[^>]*data-label="Add"/.test(html),
+    'GET / renders the interactive web.10ms form');
   console.log('       URL response body:', html);
 
   let rejected;
