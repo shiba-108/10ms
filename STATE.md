@@ -5,7 +5,7 @@ updated: 2026-11-25 | by: Cue | rev: 13
 |---|---|---|
 | T4 | Repeatable CPU benchmark; PR #14 | open |
 | T12 | Conditional PR auto-merge policy; PR #12 | open |
-| T21 | Measure Worker bundle and rendered Web output; target 20 KiB, max 50 KiB | PR #31 open |
+| T21 | Worker bundle minification and hard 20 KiB regression gate | follow-up open |
 | FX-SET | Runtime effects: @store.set; issue #26 | open |
 | T18 | Browser Web runtime: Page/Input/Btn/P/Each | PR #32 open |
 ## Done

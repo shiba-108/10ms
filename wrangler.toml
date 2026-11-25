@@ -1,6 +1,7 @@
 name = "10ms-worker"
 main = "src/host/worker/cloudflare.js"
 compatibility_date = "2026-11-24"
+minify = true
 
 [observability]
 enabled = true

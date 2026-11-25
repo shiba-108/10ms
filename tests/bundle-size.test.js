@@ -66,6 +66,7 @@ async function main() {
     assert(fs.existsSync(bundlePath), 'Wrangler must emit cloudflare.js');
     const bundleBytes = fs.statSync(bundlePath).size;
     assert(bundleBytes <= MAX_BUNDLE_BYTES, 'Worker upload must stay at or below 50 KiB');
+    assert(bundleBytes <= TARGET_BUNDLE_BYTES, 'Minified Worker upload must meet the 20 KiB target');
 
     const { tokens, seed } = lex(WEB_SOURCE);
     const page = parse(tokens, seed);
