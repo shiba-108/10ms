@@ -2,6 +2,7 @@
 // Run: node tests/core/spec-examples.test.js
 // P4: compile both canonical SPEC examples through the real lexer and parser.
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { lex } = require('../../src/core/lex');
@@ -55,6 +56,15 @@ assert.deepEqual(worker.body[2].body[0], {
   args: [{ type: 'String', value: 'hits' }],
 });
 console.log('PASS: both SPEC v1 examples compile through real lex and parse with expected AST nodes');
+
+const hashes = [];
+for (let i = 0; i < 100; i++) {
+  const output = JSON.stringify({ web: compile(webSource), worker: compile(workerSource) });
+  hashes.push(createHash('sha256').update(output).digest('hex'));
+}
+assert(hashes.every((hash) => hash === hashes[0]),
+  '100 lex→parse runs of the same SPEC examples have identical AST hashes');
+console.log(`100-run AST SHA-256: ${hashes[0]}`);
 
 const samples = [];
 for (let batch = 0; batch < 100; batch++) {
