@@ -1,0 +1,5 @@
+on GET /todo
+  reply {task: @store.get "task"}
+on POST /todo
+  need body.task text
+  reply {task: @store.set "task" body.task}
