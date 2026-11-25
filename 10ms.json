@@ -48,6 +48,7 @@
     { "id": "D18", "what": "seal", "why": "ship returns a source hash and binds the runtime to it; the same source is the same product, and rollback points to an old hash" },
     { "id": "D19", "what": "first-try rate", "why": "measure how often a new AI runs programs correctly on its first try from the one-page spec; reject features whose token cost exceeds their value" },
     { "id": "D20", "what": "frozen core + lifespan layers", "why": "the core only adds; layers change at different rates, and rules must remain true if a platform disappears" },
-    { "id": "D21", "what": "mirror", "why": "a read-only command translates any program for people; readability is a gift, while the AI-written source remains the truth" }
+    { "id": "D21", "what": "mirror", "why": "a read-only command translates any program for people; readability is a gift, while the AI-written source remains the truth" },
+    { "id": "D22", "what": "clean, tested, under-10ms PRs may auto-merge; protected-file changes and others wait", "why": "we squash-merge our own PR only when conflict-free, all tests pass, CPU is below 10ms, and none of SPEC.md, DECISIONS.md or ARCHITECTURE.md changed; every other PR stays ready for the owner's approval" }
   ]
 }
