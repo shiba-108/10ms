@@ -16,5 +16,5 @@ on POST /tasks
   need body.text text
   tasks = @store.get "tasks"
   tasks = tasks + [body.text]
-  tasks = @store.set "tasks" tasks
+  @store.set "tasks" tasks
   reply {tasks: tasks}
