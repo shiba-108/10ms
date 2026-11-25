@@ -1,0 +1,20 @@
+page /
+  tasks = []
+  text = ""
+  input text
+  btn "Add"
+    response = @net.fetch "https://todo.test/tasks" {method: "POST", body: {text: text}}
+    tasks = tasks + [text]
+    text = ""
+    response = ""
+  each tasks task
+    p task
+
+on GET /tasks
+  reply {tasks: @store.get "tasks"}
+on POST /tasks
+  need body.text text
+  tasks = @store.get "tasks"
+  tasks = tasks + [body.text]
+  @store.set "tasks" tasks
+  reply {tasks: tasks}
