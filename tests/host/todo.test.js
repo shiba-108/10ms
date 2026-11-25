@@ -11,52 +11,81 @@ const { createWorker } = require('../../src/host/worker/index');
 const SOURCE = fs.readFileSync(path.join(__dirname, '../../examples/todo.10ms'), 'utf8');
 const { tokens, seed } = lex(SOURCE);
 const AST = parse(tokens, seed);
-assert.deepEqual(AST.body.map(route => route.method), ['GET', 'POST'],
-  'the real Todo source parses into GET and POST handlers only');
+assert.deepEqual(AST.body.map(node => node.type), ['Page', 'On', 'On'],
+  'the full Todo source lexes and parses into a page and two Worker routes');
+assert.deepEqual(AST.body.slice(1).map(route => [route.method, route.path]),
+  [['GET', '/tasks'], ['POST', '/tasks']], 'the parsed source exposes GET and POST /tasks');
+const pageStatements = AST.body[0].body;
+assert.deepEqual(pageStatements.map(statement => statement.type),
+  ['Assign', 'Assign', 'Input', 'Btn', 'Each'], 'the parsed page has input, Add, and list rendering');
+assert.equal(pageStatements[3].label, 'Add');
+assert.equal(pageStatements[4].body[0].type, 'P');
 
-// Recreate the host while keeping the backing store, modeling a reload with persisted storage (P7).
-function makeWorker(store) {
-  return createWorker({ ast: AST, seed, store });
+// Adapt @net.fetch's structured body to the local HTTP JSON boundary (P7), without real network calls.
+function makeWorker(store, calls = []) {
+  let worker;
+  const fetchImpl = async (url, init = {}) => {
+    const requestUrl = new URL(url, 'https://todo.test');
+    const body = init.body && typeof init.body === 'object'
+      ? JSON.stringify(init.body) : init.body;
+    calls.push({ url: requestUrl.href, method: init.method, body: init.body });
+    return worker.fetch(new Request(requestUrl, {
+      ...init,
+      headers: { 'content-type': 'application/json', ...(init.headers || {}) },
+      body,
+    }));
+  };
+  worker = createWorker({ ast: AST, seed, store, fetchImpl });
+  return worker;
 }
 
-// Send JSON only for POST so the test follows the Worker's real request boundary (P4, P7).
-function send(worker, method, body) {
-  const init = { method };
-  if (body !== undefined) {
-    init.headers = { 'content-type': 'application/json' };
-    init.body = JSON.stringify(body);
-  }
-  return worker.fetch(new Request('https://todo.test/todo', init));
+// Read the serialized state the native form sends back with its button index (P4, P7).
+function readState(html) {
+  const match = html.match(/name="__state" value="([^"]*)"/);
+  assert(match, 'rendered page carries serialized state');
+  const decoded = match[1]
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return JSON.parse(decoded);
 }
 
-// Exercise a new task write followed by a new Worker instance reading the same store (P4, P7).
+function submitAdd(value, state) {
+  return new Request('https://todo.test/', {
+    method: 'POST',
+    body: new URLSearchParams({ __state: JSON.stringify(state), __btn: '0', text: value }),
+  });
+}
+
+// Add through the page's @net.fetch, then create a new Worker over the same durable store (P4, P7).
 async function addReloadFlow() {
-  const store = new Map();
-  const writer = makeWorker(store);
-  const emptyResponse = await send(writer, 'GET');
-  const empty = await emptyResponse.json();
-  const addResponse = await send(writer, 'POST', { task: 'Ship T20b' });
-  const added = await addResponse.json();
+  const store = new Map([['tasks', []]]);
+  const calls = [];
+  const writer = makeWorker(store, calls);
+  const initialTasksResponse = await writer.fetch(new Request('https://todo.test/tasks'));
+  const initialTasks = await initialTasksResponse.json();
+  const initialPage = await writer.fetch(new Request('https://todo.test/'));
+  const initialHtml = await initialPage.text();
+  const addResponse = await writer.fetch(submitAdd('Ship T20b', readState(initialHtml)));
+  const addedHtml = await addResponse.text();
+
   const reloadedWorker = makeWorker(store);
-  const reloadResponse = await send(reloadedWorker, 'GET');
-  const reloaded = await reloadResponse.json();
-  assert.equal(emptyResponse.status, 200);
-  assert.equal(addResponse.status, 200);
-  assert.equal(reloadResponse.status, 200);
+  const reloadResponse = await reloadedWorker.fetch(new Request('https://todo.test/tasks'));
+  const reloadedTasks = await reloadResponse.json();
   return {
-    empty,
-    added,
-    reloaded,
+    initialTasks,
+    initialHtml,
+    addedHtml,
+    reloadedTasks,
+    calls,
+    statuses: [initialTasksResponse.status, initialPage.status, addResponse.status, reloadResponse.status],
     logs: [writer.log.snapshot(), reloadedWorker.log.snapshot()],
   };
 }
 
-// Measure host CPU per GET across batches, matching the repository's process.cpuUsage convention (P1).
+// Measure real Worker GET /tasks CPU in repeated batches (P1).
 async function measureGetCpu(worker) {
-  const url = 'https://todo.test/todo';
-  for (let i = 0; i < 20; i++) {
-    await worker.fetch(new Request(url));
-  }
+  const url = 'https://todo.test/tasks';
+  for (let i = 0; i < 20; i++) await worker.fetch(new Request(url));
   const samples = [];
   const requestsPerBatch = 100;
   for (let batch = 0; batch < 100; batch++) {
@@ -74,32 +103,47 @@ async function measureGetCpu(worker) {
   };
 }
 
-// Prove repeatable behavior from the same parsed source and fresh storage (P4).
 async function main() {
   const hashes = new Set();
-  let outputHash;
   let first;
   for (let i = 0; i < 100; i++) {
     const result = await addReloadFlow();
-    assert.deepEqual(result.empty, { task: null });
-    assert.deepEqual(result.added, { task: 'Ship T20b' });
-    assert.deepEqual(result.reloaded, { task: 'Ship T20b' });
+    assert.deepEqual(result.initialTasks, { tasks: [] });
+    assert.deepEqual(result.statuses, [200, 200, 200, 200]);
+    assert.match(result.initialHtml, /<input name="text" type="text" value="" \/>/);
+    assert.match(result.initialHtml, /data-label="Add">Add<\/button>/);
+    assert.deepEqual(readState(result.initialHtml), { tasks: [], text: '' });
+    assert.match(result.addedHtml, /<p>Ship T20b<\/p>/,
+      'clicking Add POSTs through @net.fetch and renders the task with each/p');
+    assert.deepEqual(readState(result.addedHtml), {
+      tasks: ['Ship T20b'], text: '', response: '',
+    });
+    assert.deepEqual(result.reloadedTasks, { tasks: ['Ship T20b'] },
+      'GET /tasks from a fresh Worker sees the task persisted by POST /tasks');
+    assert.equal(result.calls.length, 1);
+    assert.equal(result.calls[0].url, 'https://todo.test/tasks');
+    assert.equal(result.calls[0].method, 'POST');
+    assert.deepEqual(result.calls[0].body, { text: 'Ship T20b' });
     const hash = createHash('sha256').update(JSON.stringify(result)).digest('hex');
     hashes.add(hash);
-    outputHash = outputHash || hash;
     first = first || result;
   }
-  assert.equal(hashes.size, 1, '100 add→reload runs have identical output and effect logs');
-  console.log('Todo add→reload 100-run SHA-256:', outputHash);
+  assert.equal(hashes.size, 1, '100 add→fresh Worker→reload runs have identical output and logs');
+  console.log('Todo add→reload 100-run SHA-256:', hashes.values().next().value);
 
-  const deleteResponse = await send(makeWorker(new Map()), 'DELETE');
-  assert.equal(deleteResponse.status, 404, 'Todo exposes no DELETE route');
+  const missingTextWorker = makeWorker(new Map([['tasks', []]]));
+  const invalid = await missingTextWorker.fetch(new Request('https://todo.test/tasks', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({}),
+  }));
+  assert.equal(invalid.status, 400, 'POST /tasks rejects a missing required body.text');
 
-  const cpu = await measureGetCpu(makeWorker(new Map([['task', 'persisted']])));
-  console.log('Todo GET CPU p50/p90:', cpu.p50.toFixed(6), '/', cpu.p90.toFixed(6),
+  const cpu = await measureGetCpu(makeWorker(new Map([['tasks', ['persisted']]])));
+  console.log('Todo GET /tasks CPU p50/p90:', cpu.p50.toFixed(6), '/', cpu.p90.toFixed(6),
     'ms/request (100 batches × 100 requests; process.cpuUsage user+system)');
-  assert(cpu.p50 < 10 && cpu.p90 < 10, 'Todo GET CPU p50 and p90 are below 10ms/request');
-  console.log('Todo persisted after reload:', first.reloaded.task);
+  assert(cpu.p50 < 10 && cpu.p90 < 10, 'Todo GET /tasks CPU p50 and p90 are below 10ms/request');
+  console.log('Todo persisted after fresh Worker reload:', first.reloadedTasks.tasks[0]);
   console.log('ALL PASSED');
 }
 
